@@ -1,0 +1,194 @@
+
+# Queens Housing Maintenance Data Pipeline
+
+[project]
+name = "queens_housing"
+
+
+# 1. SOURCE
+[source]
+type = "socrata"
+
+url = "https://data.cityofnewyork.us/resource/ygpa-z7cr.json"
+
+columns = [
+    "problem_id",
+    "complaint_id",
+    "building_id",
+    "received_date",
+    "borough",
+    "post_code",
+    "major_category",
+    "problem_code",
+    "complaint_status",
+    "latitude",
+    "longitude",
+    "nta"
+]
+
+filter = "borough = 'QUEENS'"
+
+date_column = "received_date"
+days_back = 14
+
+max_rows = 5000
+
+
+# 2. DATA QUALITY CHECKS
+
+[[checks]]
+name = "building ID completeness"
+why = "missing building IDs prevent matching complaints to buildings"
+sql = """
+SELECT count(*) FROM raw
+WHERE building_id IS NULL OR TRIM(building_id) = ''
+"""
+
+[[checks]]
+name = "unique problem IDs"
+why = "duplicate problem IDs would lead to overcounting"
+sql = """
+SELECT count(*) - count(DISTINCT problem_id)
+FROM raw
+"""
+
+[[checks]]
+name = "valid latitude"
+why = "invalid coordinates could cause incorrect map locations"
+sql = """
+SELECT count(*) FROM raw
+WHERE latitude IS NOT NULL
+AND (
+    TRY_CAST(latitude AS DOUBLE) IS NULL
+    OR TRY_CAST(latitude AS DOUBLE) NOT BETWEEN -90 AND 90
+)
+"""
+
+[[checks]]
+name = "valid borough"
+why = "the dataset should only contain Queens records"
+sql = """
+SELECT count(*) FROM raw
+WHERE borough IS NULL OR borough <> 'QUEENS'
+"""
+
+[[checks]]
+name = "recent complaints"
+why = "outdated data would make housing information less useful"
+sql = """
+SELECT CASE
+    WHEN MAX(TRY_CAST(received_date AS TIMESTAMP))
+         >= CURRENT_TIMESTAMP - INTERVAL 7 DAY
+    THEN 0 ELSE 1
+END
+FROM raw
+"""
+
+
+# 3. TABLES TO PUBLISH
+
+# Table 1: Clean housing problem records
+[[tables]]
+name = "housing_complaints"
+sql = """
+SELECT DISTINCT
+    problem_id,
+    complaint_id,
+    building_id,
+    TRY_CAST(received_date AS TIMESTAMP) AS received_date,
+    TRY_CAST(received_date AS DATE) AS received_day,
+    borough,
+    post_code,
+    major_category,
+    problem_code,
+    complaint_status,
+    TRY_CAST(latitude AS DOUBLE) AS latitude,
+    TRY_CAST(longitude AS DOUBLE) AS longitude,
+    nta
+FROM raw
+WHERE problem_id IS NOT NULL
+AND building_id IS NOT NULL
+"""
+
+
+# Table 2: Daily complaints by category
+[[tables]]
+name = "housing_daily_trend"
+sql = """
+SELECT
+    received_day,
+    major_category,
+    COUNT(*) AS problem_count
+FROM housing_complaints
+GROUP BY received_day, major_category
+ORDER BY received_day DESC
+"""
+
+
+# Table 3: Summary by building
+[[tables]]
+name = "housing_building_summary"
+sql = """
+SELECT
+    building_id,
+    COUNT(*) AS problem_count,
+    COUNT(DISTINCT complaint_id) AS complaint_count,
+    COUNT(DISTINCT problem_code) AS problem_types,
+    MAX(received_date) AS latest_complaint
+FROM housing_complaints
+GROUP BY building_id
+"""
+
+
+# Table 4: Top buildings by reported problems
+[[tables]]
+name = "housing_top_buildings"
+sql = """
+SELECT
+    building_id,
+    problem_count,
+    complaint_count,
+    problem_types,
+    latest_complaint
+FROM housing_building_summary
+ORDER BY problem_count DESC
+LIMIT 20
+"""
+
+
+# 4. OPTIONAL REPORTS
+
+[[report]]
+question = "What are the most common housing problems in Queens?"
+sql = """
+SELECT
+    major_category,
+    COUNT(*) AS problem_count
+FROM housing_complaints
+GROUP BY major_category
+ORDER BY problem_count DESC
+LIMIT 10
+"""
+
+[[report]]
+question = "Which buildings have the most reported housing problems?"
+sql = """
+SELECT
+    building_id,
+    problem_count,
+    complaint_count
+FROM housing_top_buildings
+ORDER BY problem_count DESC
+LIMIT 10
+"""
+
+[[report]]
+question = "How many housing problems were reported each day?"
+sql = """
+SELECT
+    received_day,
+    SUM(problem_count) AS total_problems
+FROM housing_daily_trend
+GROUP BY received_day
+ORDER BY received_day DESC
+"""
