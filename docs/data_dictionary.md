@@ -1,155 +1,113 @@
-# Data Dictionary: Queens Housing Maintenance
+# Data Dictionary · Queens Housing Explorer
 
-This document describes the four tables published by the Queens Housing Maintenance Data Pipeline. The data comes from NYC Open Data and can be used to explore housing complaints, daily trends, and building-level maintenance problems in Queens.
+## Part 1 · About the project
 
-## 1. Housing Complaints
+**Project:** Queens Housing Explorer — a housing information tool that helps users explore recent housing maintenance problems, complaint patterns, and building-level conditions in Queens, New York.
 
-**Table name on MotherDuck:`course.main.housing_complaints`
+**Source:** NYC Open Data, Housing Maintenance Code Complaints and Problems, published by the NYC Department of Housing Preservation and Development (HPD).
 
-**One row is:One housing problem reported to HPD. A single complaint may contain multiple problems.
+https://data.cityofnewyork.us/resource/ygpa-z7cr.json
 
-**Source:NYC Housing Maintenance Code Complaints and Problems, published by the NYC Department of Housing Preservation and Development (HPD).
+**Refreshed:** Currently refreshed by running `python pipeline.py` manually. Each run retrieves up to 5,000 housing problem records from the last 14 days and rebuilds the published tables. The data is a recent sample and does not include the complete complaint history.
 
-Dataset: https://data.cityofnewyork.us/d/ygpa-z7cr
-
-API: https://data.cityofnewyork.us/resource/ygpa-z7cr.json
-
-**Refreshed:Currently refreshed manually by running `python pipeline.py`. The pipeline requests records from the last 14 days, with a maximum of 5,000 records per run.
-
-**Removed on purpose:Records without a problem ID or building ID are excluded. Exact duplicate rows are removed, and the source is filtered to Queens.
-
-### Columns
-
-| Column | Type | What it means | Units or allowed values | Example |
-|---|---|---|---|---|
-| problem_id | VARCHAR | Unique identifier for a housing problem | ID | 29384179 |
-| complaint_id | VARCHAR | Identifier for the original complaint | ID | 15086488 |
-| building_id | VARCHAR | HPD identifier for the building | ID | 474682 |
-| received_date | TIMESTAMP | When the housing problem was reported | Date and time | 2026-11-09 00:00:37 |
-| received_day | DATE | Date of the report | YYYY-MM-DD | 2026-11-09 |
-| borough | VARCHAR | NYC borough | QUEENS | QUEENS |
-| post_code | VARCHAR | ZIP code of the building | ZIP code | 11372 |
-| major_category | VARCHAR | General type of housing problem | Category | HEAT/HOT WATER |
-| problem_code | VARCHAR | Specific problem reported | Category | NO HEAT |
-| complaint_status | VARCHAR | Current status of the complaint in the retrieved record | OPEN, CLOSE, etc. | CLOSE |
-| latitude | DOUBLE | Latitude of the building | Decimal degrees | 40.75 |
-| longitude | DOUBLE | Longitude of the building | Decimal degrees | -73.89 |
-| nta | VARCHAR | Neighborhood Tabulation Area | Neighborhood name | Jackson Heights |
-
-### What this data can't tell you
-
-The current pipeline only collects up to 5,000 recent records, so it does not represent all historical housing complaints in Queens.
-A reported problem does not always mean that a housing violation has been confirmed.
-Complaint counts can be affected by building size and residents' willingness to report problems.
-
-### Example questions it can answer
-
-1. What are the most common housing problems reported in Queens?
-2. How many heating and hot water problems were reported recently?
-3. Which neighborhoods have reported the most housing problems in the current dataset?
+**Removed on purpose:** The API only retrieves records from Queens. Records without a problem ID or building ID are excluded from the clean table, and fully duplicate rows are removed.
 
 ---
 
-## 2. Housing Daily Trend
+## Part 2 · The tables
 
-**Table name on MotherDuck:`course.main.housing_daily_trend`
+### Table 1: `course.main.housing_complaints`
 
-**One row is:The number of reported housing problems in one category on one day.
+**What it is:** The clean housing problem records table.
 
-**Source:Derived from `housing_complaints`, using the NYC HPD Complaints and Problems API.
+**One row is:** One individual housing problem reported to HPD. A complaint may include multiple problems.
 
-**Refreshed:Rebuilt whenever the pipeline runs successfully.
-
-**Removed on purpose:Individual complaint IDs, building information, and location details are not included because this table summarizes the data by date and problem category.
-
-### Columns
+**Built from:** `raw`
 
 | Column | Type | What it means | Units or allowed values | Example |
 |---|---|---|---|---|
-| received_day | DATE | Date when problems were reported | YYYY-MM-DD | 2026-11-16 |
-| major_category | VARCHAR | Type of housing problem | Category | HEAT/HOT WATER |
-| problem_count | BIGINT | Number of reported problems in that category on that day | Count | 100 |
+| problem_id | text | Unique ID for an individual housing problem | Identifier | 29420407 |
+| complaint_id | text | ID for the original housing complaint | Identifier; may repeat | 15106363 |
+| building_id | text | HPD ID for the building | Identifier; may repeat | 432610 |
+| received_date | timestamp | When the problem was reported | Date and time | 2026-11-15 00:07:45 |
+| received_day | date | Day when the problem was reported | YYYY-MM-DD | 2026-11-15 |
+| borough | text | Borough of the building | QUEENS | QUEENS |
+| post_code | text | ZIP code of the building | ZIP code; may be missing | 11101 |
+| major_category | text | General type of housing problem | HEAT/HOT WATER, PLUMBING, etc. | HEAT/HOT WATER |
+| problem_code | text | Specific housing problem reported | Category | NO HEAT AND NO HOT WATER |
+| complaint_status | text | Recorded status of the complaint | OPEN, CLOSE, etc. | OPEN |
+| latitude | number | Latitude of the building | Decimal degrees | 40.748466 |
+| longitude | number | Longitude of the building | Decimal degrees | -73.949282 |
+| nta | text | Neighborhood Tabulation Area | Neighborhood name | Long Island City-Hunters Point |
 
-### What this data can't tell you
+### Table 2: `course.main.housing_daily_trend`
 
-1. It cannot identify individual buildings or complaints.
-2. It only reflects the dates and records included in the current pipeline run.
-3. Daily differences may be influenced by reporting behavior and do not necessarily reflect changes in underlying housing conditions.
+**What it is:** A daily trend of housing problems by category.
 
-### Example questions it can answer
+**One row is:** One housing problem category on one day.
 
-1. How many housing problems were reported each day?
-2. Which types of housing problems are most common?
-3. How do heating complaints change across the dates covered by the dataset?
+**Built from:** `housing_complaints`
+
+| Column | Type | What it means | Units or allowed values | Example |
+|---|---|---|---|---|
+| received_day | date | Date when problems were reported | YYYY-MM-DD | 2026-11-15 |
+| major_category | text | General housing problem category | HEAT/HOT WATER, PLUMBING, etc. | HEAT/HOT WATER |
+| problem_count | integer | Number of housing problem records in the category that day | Count | 100 (illustrative) |
+
+### Table 3: `course.main.housing_building_summary`
+
+**What it is:** Building-level summary of housing maintenance problems.
+
+**One row is:** One building with at least one housing problem record in the current dataset.
+
+**Built from:** `housing_complaints`
+
+| Column | Type | What it means | Units or allowed values | Example |
+|---|---|---|---|---|
+| building_id | text | HPD building identifier | Identifier | 569090 |
+| problem_count | integer | Number of housing problem records associated with the building | Count | 261 |
+| complaint_count | integer | Number of distinct complaints associated with the building | Count | 77 |
+| problem_types | integer | Number of distinct problem codes reported for the building | Count | Varies by building |
+| latest_complaint | timestamp | Most recent received date for the building in the current dataset | Date and time | Varies by building |
+
+### Table 4: `course.main.housing_top_buildings`
+
+**What it is:** A ranking of the 20 buildings with the highest numbers of reported housing problems.
+
+**One row is:** One building in the top 20 ranking for the current dataset.
+
+**Built from:** `housing_building_summary`
+
+| Column | Type | What it means | Units or allowed values | Example |
+|---|---|---|---|---|
+| building_id | text | HPD building identifier | Identifier | 569090 |
+| problem_count | integer | Total housing problem records for the building | Count | 261 |
+| complaint_count | integer | Number of distinct complaints | Count | 77 |
+| problem_types | integer | Number of different problem codes reported | Count | Varies by building |
+| latest_complaint | timestamp | Most recent reported problem date in the current dataset | Date and time | Varies by building |
 
 ---
 
-## 3. Housing Building Summary
+## Part 3 · What this data can't tell you
 
-**Table name on MotherDuck:`course.main.housing_building_summary`
+1. The pipeline currently collects up to 5,000 records from a rolling 14-day window. It cannot show the complete complaint history of Queens or support reliable long-term comparisons.
 
-**One row is:A summary of reported housing problems for one building.
+2. A reported housing problem does not necessarily represent a confirmed housing violation. Multiple problems may also belong to the same complaint, so the number of problems and the number of complaints are different.
 
-**Source:Aggregated from `housing_complaints`, originally collected through the NYC HPD API.
+3. Complaint counts are not adjusted for building size or number of residents. Buildings with more complaints may have more housing units or higher reporting rates, so these numbers cannot directly measure overall housing quality.
 
-**Refreshed:Rebuilt whenever the pipeline runs successfully.
-
-**Removed on purpose:Individual problem records and detailed descriptions are aggregated into building-level statistics. This table keeps building IDs and summary indicators.
-
-### Columns
-
-| Column | Type | What it means | Units or allowed values | Example |
-|---|---|---|---|---|
-| building_id | VARCHAR | HPD identifier for the building | ID | 569090 |
-| problem_count | BIGINT | Total number of housing problem records for the building | Count | 261 |
-| complaint_count | BIGINT | Number of distinct complaints associated with the building | Count | 77 |
-| problem_types | BIGINT | Number of distinct problem codes reported | Count | — |
-| latest_complaint | TIMESTAMP | Most recent received date in the current dataset for this building | Date and time | — |
-
-### What this data can't tell you
-
-1. Buildings with more residents may have more complaints simply because they contain more housing units.
-2. The table does not show whether each reported problem has been resolved.
-3. The summary only covers the records downloaded during the current pipeline run, so it should not be interpreted as a building's complete complaint history.
-
-### Example questions it can answer
-
-1. Which buildings have the highest number of reported housing problems?
-2. How many different types of problems were reported in a building?
-3. Which buildings have the most recent housing complaints?
+4. The database does not currently include rental prices, available apartments, or transportation accessibility. It cannot answer questions about housing affordability or recommend apartments based on rent and commuting preferences.
 
 ---
 
-## 4. Housing Top Buildings
+## Part 4 · Example questions it can answer
 
-**Table name on MotherDuck: `course.main.housing_top_buildings`
+1. What are the most common housing maintenance problems reported in Queens? (`housing_complaints`)
 
-**One row is:One of the 20 buildings with the highest number of reported housing problems in the current dataset.
+2. How many heating and hot water problems were reported each day? (`housing_daily_trend`)
 
-**Source:Derived from `housing_building_summary`, using NYC HPD housing complaint data.
+3. Which buildings have the highest number of reported housing problems? (`housing_building_summary`)
 
-**Refreshed:Rebuilt whenever the pipeline runs successfully.
+4. Among the top 20 buildings, which have the most different types of housing problems? (`housing_top_buildings`)
 
-**Removed on purpose:Buildings outside the top 20 are excluded. The ranking is based on the number of reported housing problem records.
-
-### Columns
-
-| Column | Type | What it means | Units or allowed values | Example |
-|---|---|---|---|---|
-| building_id | VARCHAR | HPD identifier for the building | ID | 569090 |
-| problem_count | BIGINT | Number of housing problems reported for the building | Count | 261 |
-| complaint_count | BIGINT | Number of distinct complaints | Count | 77 |
-| problem_types | BIGINT | Number of distinct problem codes | Count | — |
-| latest_complaint | TIMESTAMP | Most recent received date in the current dataset for the building | Date and time | — |
-
-### What this data can't tell you
-
-1. The ranking only covers buildings included in the current sample of up to 5,000 records.
-2.  A higher complaint count does not necessarily mean a building has worse housing quality.
-3. The ranking does not account for building size, severity of problems, or how quickly complaints were resolved.
-
-### Example questions it can answer
-
-1. Which 10 buildings have the most reported housing problems?
-2. Which buildings have the highest numbers of distinct complaints?
-3. Among the top 20 buildings, which have the greatest variety of reported problems?
+5. How many distinct complaints are associated with Building 569090? (`housing_building_summary`)

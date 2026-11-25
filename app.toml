@@ -1,0 +1,56 @@
+
+# Queens Housing Explorer - AI App Settings
+
+# 1. APP INFORMATION
+
+title = "Queens Housing Explorer"
+
+description = "Explore housing maintenance problems in Queens using NYC HPD open data. Ask questions about complaints, buildings, and recent trends in plain English."
+
+
+# 2. EXAMPLE QUESTIONS
+
+examples = [
+  "What are the most common housing problems reported in Queens?",
+  "Which 10 buildings have the most reported housing problems?",
+  "How many housing problems were reported each day?",
+  "Which buildings have reported the most different types of housing problems?"
+]
+
+
+# 3. AI MODEL
+
+models = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.8-flash"]
+
+
+# 4. MAXIMUM RESULT ROWS
+
+max_rows = 200
+
+
+# 5. EXTRA INSTRUCTIONS
+
+extra_instructions = """
+The database contains housing maintenance complaints reported to NYC HPD in Queens.
+
+Use only the tables and columns described in the data dictionary.
+
+The housing_complaints table contains individual housing problem records.
+One complaint may include multiple problems, so use COUNT(DISTINCT complaint_id) when counting unique complaints.
+
+The housing_building_summary table contains building-level statistics.
+The housing_daily_trend table contains daily counts by problem category.
+The housing_top_buildings table contains the 20 buildings with the most reported problems in the current dataset.
+
+Building IDs are stored as identifiers and should not be treated as numeric measurements.
+
+The data represents a limited recent sample, not all housing complaints in Queens.
+Do not describe the results as complete citywide or historical statistics.
+
+A reported problem does not necessarily mean a confirmed housing violation.
+Higher complaint counts do not necessarily indicate worse building quality.
+
+When the user asks about information not available in the database, explain the limitation instead of guessing.
+
+Use clear, simple English and include relevant numbers in your answers.
+"""
